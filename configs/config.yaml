@@ -2,12 +2,14 @@ defaults:
   - _self_
 
 # Training parameters
-seed: 42
-batch_size: 64
+seed: 1234
+batch_size: 128
 epochs: 20
 lr: 0.001
 resample_rate: 200
 # Added
-num_workers: 4
+num_workers: 32
 data_dir: "data"
 device: "cuda"  # or "cpu"
+
+use_wandb: False

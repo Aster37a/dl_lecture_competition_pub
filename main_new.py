@@ -1,4 +1,4 @@
-import os, sys
+import os
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -9,10 +9,9 @@ import wandb
 from termcolor import cprint
 from tqdm import tqdm
 
-from src.datasets import ThingsMEGDataset
-from src.models import BasicConvClassifier
+from src.datasets_new import ThingsMEGDataset
+from src.models_new import BasicTransformerClassifier
 from src.utils import set_seed
-
 
 @hydra.main(version_base=None, config_path="configs", config_name="config")
 def run(args: DictConfig):
@@ -25,32 +24,46 @@ def run(args: DictConfig):
     # ------------------
     #    Dataloader
     # ------------------
+        
+    #古いバージョン
+        
     loader_args = {"batch_size": args.batch_size, "num_workers": args.num_workers}
-    
+
     train_set = ThingsMEGDataset("train", args.data_dir)
     train_loader = torch.utils.data.DataLoader(train_set, shuffle=True, **loader_args)
+
     val_set = ThingsMEGDataset("val", args.data_dir)
     val_loader = torch.utils.data.DataLoader(val_set, shuffle=False, **loader_args)
+
     test_set = ThingsMEGDataset("test", args.data_dir)
     test_loader = torch.utils.data.DataLoader(
         test_set, shuffle=False, batch_size=args.batch_size, num_workers=args.num_workers
     )
+    
+
+    
 
     # ------------------
     #       Model
     # ------------------
-    model = BasicConvClassifier(
-        train_set.num_classes, train_set.seq_len, train_set.num_channels
+    model = BasicTransformerClassifier(
+        num_classes=train_set.num_classes, 
+        seq_len=train_set.seq_len, 
+        in_channels=train_set.num_channels,
+        dropout=0.1  # ドロップアウト率を0.1に設定
     ).to(args.device)
 
     # ------------------
     #     Optimizer
     # ------------------
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr * 0.1, weight_decay=1e-4)  # 学習率を低く設定
 
     # ------------------
     #   Start training
     # ------------------  
+
+ 
+    #新しいバージョン
     max_val_acc = 0
     accuracy = Accuracy(
         task="multiclass", num_classes=train_set.num_classes, top_k=10
@@ -96,22 +109,23 @@ def run(args: DictConfig):
             cprint("New best.", "cyan")
             torch.save(model.state_dict(), os.path.join(logdir, "model_best.pt"))
             max_val_acc = np.mean(val_acc)
-            
     
     # ----------------------------------
     #  Start evaluation with best model
     # ----------------------------------
+     
+    #新しいバージョン
     model.load_state_dict(torch.load(os.path.join(logdir, "model_best.pt"), map_location=args.device))
 
     preds = [] 
     model.eval()
-    for X, subject_idxs in tqdm(test_loader, desc="Validation"):        
-        preds.append(model(X.to(args.device)).detach().cpu())
-        
+    for X, subject_idxs in tqdm(test_loader, desc="Evaluation"):
+        with torch.no_grad():
+            preds.append(model(X.to(args.device)).detach().cpu())
+            
     preds = torch.cat(preds, dim=0).numpy()
-    np.save(os.path.join(logdir, "submission"), preds)
+    np.save(os.path.join(logdir, "submission.npy"), preds)
     cprint(f"Submission {preds.shape} saved at {logdir}", "cyan")
-
 
 if __name__ == "__main__":
     run()
