@@ -1,4 +1,10 @@
 data/*
+data-Copy1/
+data-fromgit/
+src-Copy1/
+src-copy2/
+src-old/
+useless/
 !data/.gitkeep
 
 outputs/
